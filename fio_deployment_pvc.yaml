@@ -15,34 +15,61 @@ spec:
       labels:
         app: fio
     spec:
+      tolerations:
+        - operator: Exists
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: topology.kubernetes.io/region
+                    operator: In
+                    values:
+                      - LGA1
+                  - key: node.coreweave.cloud/class
+                    operator: In
+                    values:
+                      - gpu
       containers:
-      - name: fio
-        image: joshuarobinson/fio:3.19
-        command: ["sh"]
-        args: ["-c", "echo ${HOSTNAME} && mkdir -p /scratch/${HOSTNAME} && fio /configs/fio.job --eta=never --directory=/scratch/${HOSTNAME}"]
-        volumeMounts:
-        - name: fio-config-vol
-          mountPath: /configs
-        - name: fio-data
-          mountPath: /scratch
-        imagePullPolicy: Always
+        - name: fio
+          image: joshuarobinson/fio:3.19
+          command:
+            - sh
+            - -c
+            - |
+              echo ${HOSTNAME} && mkdir -p /scratch/${HOSTNAME} && fio /configs/fio.job --eta=never --directory=/scratch/${HOSTNAME}
+          resources:
+            requests:
+              cpu: "4"
+              memory: 4Gi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: 8Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: fio-config-vol
+              mountPath: /configs
+            - name: fio-data
+              mountPath: /scratch
+          imagePullPolicy: Always
       restartPolicy: Always
       volumes:
-      - name: fio-config-vol
-        configMap:
-          name: fio-job-config
-      - name: fio-data
-        persistentVolumeClaim:
-          claimName: fio-claim
+        - name: fio-config-vol
+          configMap:
+            name: fio-job-config
+        - name: fio-data
+          persistentVolumeClaim:
+            claimName: fio-claim
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: fio-claim
 spec:
-  storageClassName: pure-file
+  storageClassName: shared-vast-lga1
   accessModes:
-  - ReadWriteMany
+    - ReadWriteMany
   resources:
     requests:
-      storage: 1Ti
+      storage: 50Gi
